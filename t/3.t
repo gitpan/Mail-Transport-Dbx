@@ -1,7 +1,7 @@
 use Test;
 use File::Spec;
 
-BEGIN { plan tests => 29 };
+BEGIN { plan tests => 28 };
 use lib qw(../blib/lib ../blib/arch);
 use Mail::Transport::Dbx;
 
@@ -96,10 +96,8 @@ ok($item->recip_address, '<noreply@freshmeat.net>');
 ok($item->oe_account_name, "pbox.dialup.rwth-aachen.de");
 ok($item->oe_account_num, "00000001");
 ok($item->fetched_server, "pbox.dialup.rwth-aachen.de");
-ok($item->date_received("%a %b %e %H:%M:%S %Y", 25, 1), 
-   "Mon Jun 17 20:02:30 2002");
-ok($item->date_received("%Y", 5, 1), 2002);
-ok($item->date_received("%a %b %e %H:%M:%S %Y", 4, 1) =~ /^Mon/);
+ok($item->rcvd_gmtime, "Mon Jun 17 20:02:30 2002");
+ok($item->date_received);
 ok($item->is_seen);
 ok($item->is_email);
 ok($item->is_folder, 0);

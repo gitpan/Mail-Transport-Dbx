@@ -14,6 +14,15 @@ To install this module type the following:
    make test
    make install
 
+If you happen to be using ActiveState's Perl under Windows, you can install
+this module using ppm. You have to set the repository:
+
+    ppm> set repository sourceforge http://mail-mboxparser.sourceforge.net/ppm
+    ppm> install Mail-Transport-Dbx[-580]
+
+If you are using ActivePerl 5.8.0 you have to append '-580' as 5.8.0 is no
+longer binary-compatible with older perls.
+
 In case of problems, read on.
 
 DEPENDENCIES
@@ -24,26 +33,30 @@ This module requires these other modules and libraries:
 
 PROBLEMS:
 
+Compilation:
+------------
+As of v0.02, Mail::Transport::Dbx also supports suncc and MS VisualC.
+
 Solaris:
 --------
-You may experience problems with Solaris' ucbcc compiler. If that is the case
-try to compile with gcc. Unfortunately, ExtUtils::MakeMaker doesn't allow
-to pass the CC variable so you have to change 'Makefile.PL' and 
-'libdbx/Makefile.PL'. See the comments in the call to WriteMakefile().
+For suncc you might need to 
 
-Compilation might still emit warnings but you can usually ignore them. 
-If 'make test' afterwards works there is nothing to worry about.
+  perl Makefile.PL CCFLAGS=-Xa
+  make
+  make test
+  make install
 
+instead of the ordinary 'perl Makefile.PL'. This will put suncc into ANSI 
+mode.
+      
 Windows:
 --------
-Not yet tested for ActivePerl. I don't expect it to compile out of the box.
-If you try you might encounter problems with nmake failing to parse the 
-generated Makefile. Once I have a workable version for windows, I'll release
-a ppm package.
+Tested both on ActiveState's 5.6.1 and 5.8.0beta release. Should compile out 
+of the box.
 
 Other platforms:
 ----------------
-Please let me know when you are using a platform not mentioned here and 
+Please let me know if you are using a platform not mentioned here and 
 encounter problems.
 
 COPYRIGHT AND LICENCE

@@ -1,7 +1,7 @@
 use Test;
 use File::Spec;
 
-BEGIN { plan tests => 27 };
+BEGIN { plan tests => 26 };
 
 use Mail::Transport::Dbx;
 
@@ -33,10 +33,8 @@ ok($item->recip_address, '<tassilo.parseval@post.rwth-aachen.de>');
 ok($item->oe_account_name, "pbox.dialup.rwth-aachen.de");
 ok($item->oe_account_num, "00000001");
 ok($item->fetched_server, "pbox.dialup.rwth-aachen.de");
-ok($item->date_received("%a %b %e %H:%M:%S %Y", 25, 1), 
-   "Sun Apr 14 00:27:57 2002");
-ok($item->date_received("%Y", 5, 1), 2002);
-ok($item->date_received("%a %b %e %H:%M:%S %Y", 4, 1) =~ /^Sun/);
+ok($item->rcvd_gmtime, "Sun Apr 14 00:27:57 2002");
+ok($item->date_received);
 ok($item->is_seen);
 ok($item->is_email);
 ok($item->is_folder, 0);

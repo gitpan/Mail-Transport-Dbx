@@ -26,26 +26,26 @@ WriteMakefile(
     clean  => {'FILES' => 'libdbx$(LIBEEXT)'},
     test   => {'TESTS' => ''},
     DEFINE => "-D$BYTEORDER",
-    # if you have problems compiling with the defaults,
-    # please uncomment the following three lines and check that
-    # they reflect your setup:
-    # 'CC'          => 'gcc',
-    # 'OPTIMIZE'    => '-O',
 );
 
 sub MY::top_targets {
-    '
+    my $self = shift;
+    my $flags;
+    if ($self->{AR} eq 'lib') { # the Microsoft's ar
+        $flags = "/OUT:";
+    } else {                    # use defaults
+        $flags = $self->{AR_STATIC_ARGS}. " ";
+    }
+    "
 all :: static
 
-static ::       libdbx$(LIB_EXT)
+static ::       libdbx\$(LIB_EXT)
 
-libdbx$(LIB_EXT): $(O_FILES)
-	$(AR) cr libdbx$(LIB_EXT) $(O_FILES)
-	$(RANLIB) libdbx$(LIB_EXT)
+libdbx\$(LIB_EXT): \$(O_FILES)
+	\$(AR) ${flags}libdbx\$(LIB_EXT) \$(O_FILES)
+	\$(RANLIB) libdbx\$(LIB_EXT)
 
 pure_all:
 	
-';
+";
 }
-
-

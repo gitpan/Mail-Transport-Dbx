@@ -56,7 +56,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -101,7 +101,7 @@ Mail::Transport::Dbx - Parse Outlook Express mailboxes
 
     my $dbx = Mail::Transport::Dbx->new("box.mbx");
     
-    for my $i (0 .. $dbx->msgcount) {
+    for my $i (0 .. $dbx->msgcount - 1) {
         my $msg = $dbx->get($i);
         print $msg->subject;
         ...
@@ -180,7 +180,7 @@ Be careful with using a filehandle, though. On Windows, you might need to use C<
 
 =item B<msgcount>
 
-Returns the number of items stored in the dbx structure. If you previously opened Folders.dbx C<msgcount()> returns the number of subfolders in it. Otherwise it returns the number of messages.
+Returns the number of items stored in the dbx structure. If you previously opened Folders.dbx C<msgcount()> returns the number of subfolders in it. Otherwise it returns the number of messages. C<msgcount() - 1> is the index of the last item.
 
 =item B<get(n)>
 
@@ -291,6 +291,14 @@ Outlook Express accounts also seem to have a numerical representation. This meth
 =item B<fetched_server>
 
 Returns the name of the POP server that this message was retrieved from as a string.
+
+=item B<rcvd_localtime>
+
+This is the exact duplicate of Perl's builtin C<localtime()> applied to the date this message was received. It returns a string in scalar context and a list with nine elements in list context. See 'perldoc -f localtime' for details.
+
+=item B<rcvd_gmtime>
+
+Same as C<rcvd_localtime()> but returning a date conforming to GMT.
 
 =item B<date_received( [format, [len, [gmtime]]] )>
 
@@ -441,7 +449,7 @@ Don't use this one!
 
 =item * DBX_TYPE_VOID
 
-I have no idea what this is :-(.
+I have no idea what this is for.
 
 =back
 
@@ -468,8 +476,6 @@ You can't retrieve the internal state of the objects using C<Data::Dumper> or so
 There are currently no plans to implement write access to .dbx files. I leave that up to the authors of libdbx.
 
 =head1 KNOWN BUGS
-
-I am still sceptical with respect to my endianness patch. If you encounter problems on a SUN or a Macintosh (or some other big-endian machine), blame it on me and let me know about it.
 
 Other than that I don't know yet of any. This, of course, has never actually been a strong indication for the absence of bugs.
 

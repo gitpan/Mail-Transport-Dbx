@@ -19,7 +19,7 @@
 /* Heavily patched to make it run on big-endian machines */
 /*********************************************************/
 
-//#include <stdio.h>
+/* #include <stdio.h> */
 #include <stdlib.h>
 #include <string.h>
 
@@ -27,11 +27,14 @@
 #include "define.h"
 
 # if defined DBX_BIG_ENDIAN
+
+/* '((x & 0xff000000) >> 24) & 0x000000ff' is a fix for Solaris' ucbcc */
+
 #  define LE32_CPU(x) \
-  x = ((((x) & 0xff000000) >> 24) | \
-       (((x) & 0x00ff0000) >> 8 ) | \
-       (((x) & 0x0000ff00) << 8 ) | \
-       (((x) & 0x000000ff) << 24));
+  x = (((((x) & 0xff000000) >> 24) & 0x000000ff) | \
+        (((x) & 0x00ff0000) >> 8 ) | \
+        (((x) & 0x0000ff00) << 8 ) | \
+        (((x) & 0x000000ff) << 24));
 #  define LE16_CPU(x) \
   x = ((((x) & 0xff00) >> 8) | \
        (((x) & 0x00ff) << 8));
@@ -43,7 +46,7 @@
 # endif
 
 int dbx_errno = 0;
-//could be 0xE4 or 0x30
+/* could be 0xE4 or 0x30 */
 #define INDEX_POINTER 0xE4
 #define ITEM_COUNT 0xC4
 
@@ -102,12 +105,12 @@ DBX *dbx_open_stream(FILE *fp) {
     
     /* SIGNATURE */
     _dbx_getAtPos(dbx->fd, 0x0, &signature, 16);
-
+    
     LE32_CPU(signature[0]);
     LE32_CPU(signature[1]);
     LE32_CPU(signature[2]);
     LE32_CPU(signature[3]);
-    
+
     if ( signature[0] == 0xFE12ADCF && signature[1] == 0x6F74FDC5 &&
          signature[2] == 0x11D1E366 && signature[3] == 0xC0004E9A ) {
         
@@ -439,8 +442,7 @@ int _dbx_getindex(FILE* fp, int pos, DBX *dbx)
 	struct _dbx_tableindexstruct tindex;
 	struct _dbx_indexstruct index;
 
-	RET_DERROR(_dbx_getAtPos(fp, pos, &tindex, sizeof(tindex)), DBX_INDEX_READ,
-				"[%d] Failed to read table index structure\n", __LINE__);
+	RET_ERROR(_dbx_getAtPos(fp, pos, &tindex, sizeof(tindex)), DBX_INDEX_READ);
 	
     LE32_CPU(tindex.self);
     LE32_CPU(tindex.unknown1);
@@ -454,18 +456,14 @@ int _dbx_getindex(FILE* fp, int pos, DBX *dbx)
 
 	pos += sizeof(struct _dbx_tableindexstruct);
 	
-	DEBUG_INDEX("[%d] ptrCount = %d\n", __LINE__, tindex.ptrCount);
-	
     for (x = 1; x <= tindex.ptrCount; x++) {
-        RET_DERROR(_dbx_getAtPos(fp, pos, &index, 
-                    sizeof(struct _dbx_indexstruct)), DBX_INDEX_READ,
-        		   "[%d] Failed to read index structure at pos %d\n", 
-                   __LINE__, pos);
+        RET_ERROR(_dbx_getAtPos(fp, pos, &index, 
+                  sizeof(struct _dbx_indexstruct)), DBX_INDEX_READ);
         LE32_CPU(index.indexptr);
         LE32_CPU(index.anotherTablePtr);
         LE32_CPU(index.indexCount);
-        RET_DERROR(dbx->indexCount < 0, DBX_INDEX_OVERREAD,
-        		   "[%d] Read too many indexes\n", __LINE__);
+
+        RET_ERROR(dbx->indexCount < 0, DBX_INDEX_OVERREAD);
 		
         dbx->indexes[--dbx->indexCount] = index.indexptr;
         pos += sizeof(struct _dbx_indexstruct);
@@ -506,10 +504,8 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	  *item = folder;
 	}
 
-	RET_DERROR(_dbx_getAtPos(fp, pos, &blockhdr, sizeof(blockhdr)),
-               DBX_INDEX_READ,
-		       "[%d] Failed to read header of email block at pos %d\n", 
-               __LINE__, pos);
+	RET_ERROR(_dbx_getAtPos(fp, pos, &blockhdr, sizeof(blockhdr)), 
+              DBX_INDEX_READ);
    
     LE32_CPU(blockhdr.self);
     LE32_CPU(blockhdr.size);
@@ -519,10 +515,7 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
      * as we will be accessing it byte by byte */
 
 	buffer = (char*) malloc(blockhdr.size);
-	RET_DERROR(_dbx_get(fp, buffer, blockhdr.size), DBX_DATA_READ,
-		       "[%d] Failed to read datablock of size %d from pos %d\n", 
-               __LINE__, blockhdr.size, 
-               pos + sizeof(struct _dbx_email_headerstruct));
+	RET_ERROR(_dbx_get(fp, buffer, blockhdr.size), DBX_DATA_READ);
 	bufptr = buffer;
 	if (email)
 		email->data_offset = -1;
@@ -575,7 +568,7 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	    	readtype = STRING_TYPE;
 	    	break;
 	    case 0x0D: 
-            /*Sender's name */
+            /* Sender's name */
 	        bufx = &(email->sender_name);
 	        readtype = STRING_TYPE;
 	        break;
@@ -641,7 +634,7 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	    case 0x90: //currently unknown
 	    case 0x91: //currently unknown
 	        bufx = NULL;
-	        break;*/
+	        break; */
 	    default:
 	      bufx = NULL;
 	    }
@@ -692,9 +685,7 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	if (type == DBX_TYPE_FOLDER || body == 0)
 	    return 0;
 
-    RET_DERROR(email->data_offset == -1, DBX_DATA_READ,
-               "[%s:%d] Dataptr hasn't been set for current email\n",
-               __FILE__, __LINE__);
+    RET_ERROR(email->data_offset == -1, DBX_DATA_READ);
 
 	return _dbx_getBody(fp, &(email->email), email->data_offset);
 }
@@ -706,8 +697,7 @@ int _dbx_getBody(FILE *fp, char** x, int ptr)
     *x = NULL;
     
     while (ptr != 0) {
-	    RET_DERROR(_dbx_getAtPos(fp, ptr, &hdr, sizeof(hdr)), DBX_DATA_READ,
-		                         "[%d] Failed to read datalength\n", __LINE__);
+	    RET_ERROR(_dbx_getAtPos(fp, ptr, &hdr, sizeof(hdr)), DBX_DATA_READ);
         LE32_CPU(hdr.self);
         LE32_CPU(hdr.nextaddressoffset);
         LE16_CPU(hdr.blocksize);
@@ -715,8 +705,7 @@ int _dbx_getBody(FILE *fp, char** x, int ptr)
         /* this plus one will not be accumulative cause we don't add it to
          * bufsize but we need it so we can terminate the buffer */
 	    *x = realloc(*x, bufsize + hdr.blocksize + 1);
-	    RET_DERROR(_dbx_get(fp, (*x)+bufsize, hdr.blocksize), DBX_DATA_READ,
-		           "[%d] Failed to read data\n", __LINE__);
+	    RET_ERROR(_dbx_get(fp, (*x)+bufsize, hdr.blocksize), DBX_DATA_READ);
 	    bufsize += hdr.blocksize;
 	    ptr = hdr.nextaddress;
 	}
@@ -738,14 +727,14 @@ int _dbx_getstruct(FILE *fp, int pos, DBXFOLDER* folder)
     
     folder->name = NULL;
     
-	RET_DERROR(_dbx_getAtPos(fp, pos, &hdr, sizeof(hdr)), DBX_DATA_READ,
-			   "[%d] Failed to read Folder Header at pos %d\n", __LINE__, pos);
+	RET_ERROR(_dbx_getAtPos(fp, pos, &hdr, sizeof(hdr)), DBX_DATA_READ);
+
     LE32_CPU(hdr.self);
     LE32_CPU(hdr.blocksize);
     LE16_CPU(hdr.unknown2);
 
-	RET_DERROR(_dbx_get(fp, &fol, sizeof(fol)), DBX_DATA_READ,
-			   "[%d] Failed to read Folder Header at pos %d\n", __LINE__, pos);
+	RET_ERROR(_dbx_get(fp, &fol, sizeof(fol)), DBX_DATA_READ);
+
     LE32_CPU(fol.id);
     LE32_CPU(fol.parent);
     LE32_CPU(fol.unknown6)
@@ -753,20 +742,18 @@ int _dbx_getstruct(FILE *fp, int pos, DBXFOLDER* folder)
     buf = (char*) malloc(fol.length1);
     msgoffset = hdr.intcount * sizeof(int);
 	
-    RET_DERROR(_dbx_getAtPos(fp, pos+blockpos+msgoffset, buf, fol.length1), 
-               DBX_DATA_READ, "[%d] Failed to read Folder name at pos %d\n", 
-               __LINE__, pos + msgoffset);
+    RET_ERROR(_dbx_getAtPos(fp, pos+blockpos+msgoffset, buf, fol.length1), 
+               DBX_DATA_READ);
     
     if (strlen(buf) != fol.length1 - 1) { }
 
-    /*Allocate space big enough to hold remainder of block*/
+    /* Allocate space big enough to hold remainder of block */
     fname = (char*) malloc(hdr.blocksize - blockpos);
     if (!fname) {
         return -1;
 	}
 	
-	RET_DERROR(_dbx_get(fp, fname, hdr.blocksize-blockpos), DBX_DATA_READ,
-					"[%d] Failed to read filename of folder\n", __LINE__);
+	RET_ERROR(_dbx_get(fp, fname, hdr.blocksize-blockpos), DBX_DATA_READ);
 	
 	folder->name = buf;
 	folder->fname = fname;
@@ -800,8 +787,7 @@ int _dbx_get_from_buf(char* buffer, int pos, void** dest, int type, int max)
     /* copy data from buffer to string pointed to by bufx */
     if (type == STRING_TYPE) {
         y = strlen(&buffer[pos]) + 1; /* plus one for string terminator */
-    RET_DERROR(y > max, DBX_DATA_READ,
-	           "[%d] Length of string being read[%d] from data buffer is greater than buffer size[%d]", __LINE__, y, max);
+        RET_ERROR(y > max, DBX_DATA_READ);
         if (!*dest)
             *dest = (char*) malloc(y);
         strncpy(*dest, &buffer[pos], y);

@@ -17,7 +17,6 @@
 
 /*
 	libdbx - read dbx files as used by Outlook Express 5.0
-
 */
 
 #ifndef _LIBDBX_H_
@@ -27,65 +26,70 @@
 
 #define LIBDBX_VERSION "1.0.3"
 
+#ifdef _WIN32
+# include <Windows.h>
+# define FILETIME_DEFINED
+#endif
+
 #ifndef FILETIME_DEFINED
 #define FILETIME_DEFINED
-/*Win32 Filetime struct - copied from WINE*/
+/* Win32 Filetime struct - copied from WINE */
 typedef struct {
 	unsigned int dwLowDateTime;
-  unsigned int dwHighDateTime;
+    unsigned int dwHighDateTime;
 } FILETIME;
 #endif
 
 /* Control Structure */
 struct dbxcontrolstruct {
-	FILE *fd; //file descriptor of the dbx file
-	int indexCount; //number of elements in the following array
-	int * indexes; //array of indexes
-	int type; //type of DBX file
+	FILE *fd;       /* file descriptor of the dbx file */
+	int indexCount; /* number of elements in the following array */
+	int * indexes;  /* array of indexes */
+	int type;       /* type of DBX file */
 };
 
 typedef struct dbxcontrolstruct DBX;
 
 /* Folder Entity - Extracted from folders.dbx */
 struct dbxfolderstruct {
-  int  num; //index number of folder
-  char type; //is folder or email
-	char *name; //name of folder
-	char *fname; //filename of the folder
-	int id; //numeric id of the folder
-	int parentid; //numeric id of the parent folder
+    int  num;       /* index number of folder */
+    char type;      /* is folder or email */
+	char *name;     /* name of folder */
+	char *fname;    /* filename of the folder */
+	int id;         /* numeric id of the folder */
+	int parentid;   /* numeric id of the parent folder */
 };
 
 typedef struct dbxfolderstruct DBXFOLDER;
 
 /* Email Entity - Extracted from a mail type .dbx file */
 struct dbxemailstruct {
-	int num; //index number of item
-  char type; //is folder or email
-  char *email; //email contents
-  char *psubject; //Processed subject line (without RE: etc...)
-  char *subject; //original subject line
-  char *messageid; //message's mail id
-  char *parent_message_ids; //ids of parents
-  char *sender_name;
-  char *sender_address;
-  char *recip_name;
-  char *recip_address;
-  FILETIME date; //of what I am unsure
-  int  id; //dbx id
-  int  data_offset; //offset of the body portion in the dbx file
-  int  flag; //flags of email
-  char *oe_account_name; //name of the account that accepted this email
-  char *oe_account_num; //string representation of the account number (e.g. "00000001")
-  char *fetched_server; //name of POP server message came from
+	int num;                    /* index number of item */
+    char type;                  /* is folder or email */
+    char *email;                /* email contents */
+    char *psubject;             /* Processed subject line (without RE: etc..) */
+    char *subject;              /* original subject line */
+    char *messageid;            /* message's mail id */
+    char *parent_message_ids;   /* ids of parents */
+    char *sender_name;
+    char *sender_address;
+    char *recip_name;
+    char *recip_address;
+    FILETIME date;            /* of what I am unsure */
+    int  id;                  /* dbx id */
+    int  data_offset;         /* offset of the body portion in the dbx file */
+    int  flag;                /* flags of email */
+    char *oe_account_name;    /* name of the account that accepted this email */
+    char *oe_account_num;     /* string representation of the account number */
+    char *fetched_server;     /* name of POP server message came from */
 };
 
 typedef struct dbxemailstruct DBXEMAIL;
 
 /* Non-Entity - just the header type */
 struct dbxnonstruct {
-	int num; //not really important
-	char type; //used to determine the type of this object
+	int num;    /* not really important */
+	char type;  /* used to determine the type of this object */
 };
 
 typedef struct dbxnonstruct DBXNON;
@@ -114,6 +118,11 @@ extern int dbx_errno;
 #define DBX_NEWS_ITEM 8
 
 /* Prototypes */
+
+#ifdef __SUNPRO_C
+#   define const
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -134,23 +143,23 @@ const char* dbx_strerror(int err);
 }
 #endif
 
-/*Types of DBX file*/
-/*0 - Contains emails*/
+/* Types of DBX file */
+/* 0 - Contains emails */
 #define DBX_TYPE_EMAIL 0
-/*1 - Contains news group items*/
+/* 1 - Contains news group items */
 #define DBX_TYPE_NEWS 1
-/*2 - Contains the folder structure of Outlook*/
+/* 2 - Contains the folder structure of Outlook */
 #define DBX_TYPE_FOLDER 2
-/*3 - Contains a none entity structure*/
+/* 3 - Contains a none entity structure */
 #define DBX_TYPE_VOID 3
 
-/*Fetch flags for dbx_get*/
-/*1<<0 - Fetch the body*/
+/* Fetch flags for dbx_get */
+/* 1<<0 - Fetch the body */
 #define DBX_FLAG_BODY 1<<0
 
 
-/*Flag defines for email->flag*/
+/* Flag defines for email->flag */
 /* 0x80 - Is Seen (10000000) */
 #define DBX_EMAIL_FLAG_ISSEEN 0x80
 
-#endif //_LIBDBX_H_
+#endif /* LIBDBX_H */

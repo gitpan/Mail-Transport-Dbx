@@ -14,11 +14,6 @@ WriteMakefile(
     'DEFINE'		=> '', 
     'INC'		    => '-I.', 
     'MYEXTLIB'      => 'libdbx/libdbx$(LIB_EXT)',
-    # if you have problems compiling with the defaults,
-    # please uncomment the following three lines and check that
-    # they reflect your setup:
-    # 'CC'          => 'gcc',
-    # 'OPTIMIZE'    => '-O',
 );
 
 if  (eval {require ExtUtils::Constant; 1}) {
@@ -51,6 +46,14 @@ else {
 sub MY::postamble {
     '
 $(MYEXTLIB): libdbx/Makefile
-	cd libdbx && $(MAKE) $(PASSTHRU)
+	cd libdbx && $(MAKE) $(PASTHRU)
 ';
+}
+
+sub MY::pasthru {
+    return <<'PASTHRU'
+PASTHRU = "CCFLAGS=$(CCFLAGS)"\
+          "CC=$(CC)"  \
+          "OPTIMIZE=$(OPTIMIZE)"
+PASTHRU
 }

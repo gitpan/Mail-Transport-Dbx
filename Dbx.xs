@@ -9,6 +9,12 @@
 
 #include "const-c.inc"
 
+/* This is not gentlemen-like:
+ * But under Win32: (PerlIO*) == (FILE*) */
+#ifdef _WIN32
+# define PerlIO_exportFILE(f,fl) ((FILE*)(f))
+#endif
+
 #define glob_ref(sv) (SvROK(sv) && SvTYPE(SvRV(sv)) == SVt_PVGV)
 #define sv_to_file(sv) (PerlIO_exportFILE(IoIFP(sv_2io(sv)), NULL))
 
@@ -27,7 +33,16 @@ struct dbx_folder {
 typedef struct dbx_email    DBX_EMAIL;
 typedef struct dbx_folder   DBX_FOLDER;
 
-char * errstr (void) {
+/* copied from perl/pp_sys.c */
+static char *dayname[] = {
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+static char *monname[] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+char * errstr () {
         switch(dbx_errno) {
             /* messages copied from libdbx.h */
             case DBX_NOERROR:
@@ -56,9 +71,11 @@ char * errstr (void) {
         return "Odd...an unknown error occured";
 }
 
-void split_mail (DBX_EMAIL *self) {
+void split_mail (pTHX_ DBX_EMAIL *self) {
+
     if (self->header)
         return;
+    
     else {
         char *ptr;
         int count = 0;
@@ -68,6 +85,21 @@ void split_mail (DBX_EMAIL *self) {
             (void) dbx_get_email_body(self->dbx, self->email);
         
         ptr = self->email->email;
+        
+        if (dbx_errno == DBX_DATA_READ) {
+            /* A message can be there and not be there at the same time!
+             * Explanation:
+             * newsgroup items can be downloaded partially in OutlookX
+             * In this case dbx_get_email_body() will store nothing in
+             * self->email->email in which case header and body would be 
+             * empty. then dbx_errno is set to DBX_DATA_READ which we
+             * don't consider an error here */
+            dbx_errno = DBX_NOERROR;
+            return;
+        }
+        if (dbx_errno == DBX_BADFILE)
+            croak("dbx panic: file stream disappeared");
+
         while (ptr+4) {
             /* two newlines is separator */
             if (strnEQ(ptr, "\r\n\r\n", 4)) {
@@ -87,6 +119,45 @@ void split_mail (DBX_EMAIL *self) {
     }
 }
     
+int datify (pTHX_ FILETIME *wintime, int method) {
+    dSP;
+    time_t time = FileTimeToUnixTime(wintime, NULL);
+    struct tm *tstruct;
+    (void) POPs; /* removing pending object which is in ST(0) */
+
+    if (method == 0)  /* localtime */
+        tstruct = localtime(&time);
+    else              /* gmtime */
+        tstruct = gmtime(&time);
+    
+    if (GIMME == G_ARRAY) {
+        EXTEND(SP, 9);
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_sec)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_min)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_hour)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_mday)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_mon)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_year)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_wday)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_yday)));
+        PUSHs(sv_2mortal(newSViv(tstruct->tm_isdst)));
+        PUTBACK;
+        return 9;
+    } else {
+        SV *str = newSVpvf("%s %s %2d %02d:%02d:%02d %d",
+                  dayname[tstruct->tm_wday],
+                  monname[tstruct->tm_mon],
+                  tstruct->tm_mday,
+                  tstruct->tm_hour,
+                  tstruct->tm_min,
+                  tstruct->tm_sec,
+                  tstruct->tm_year + 1900);                   
+        EXTEND(SP, 1);
+        PUSHs(sv_2mortal(str));
+        PUTBACK;
+        return 1;
+    }
+}
 
 MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx
 
@@ -177,6 +248,9 @@ as_string (self)
     CODE:
         if (!(RETVAL = self->email->email)) {
             (void) dbx_get_email_body(self->dbx, self->email);
+            if (dbx_errno == DBX_DATA_READ)
+                /* see comment in split_mail() */        
+                XSRETURN_UNDEF;
             RETVAL = self->email->email;
         }
     OUTPUT:
@@ -186,8 +260,9 @@ char *
 header (self)
         DBX_EMAIL *self;
     CODE:
-        split_mail(self);
-        RETVAL = self->header;
+        split_mail(aTHX_ self);
+        if (!(RETVAL = self->header))
+            XSRETURN_UNDEF;
     OUTPUT:
         RETVAL
 
@@ -195,8 +270,9 @@ char *
 body (self)
         DBX_EMAIL *self;
     CODE:
-        split_mail(self);
-        RETVAL = self->body;
+        split_mail(aTHX_ self);
+        if (!(RETVAL = self->body))
+            XSRETURN_UNDEF;
     OUTPUT:
         RETVAL
 
@@ -272,6 +348,18 @@ fetched_server (self)
     OUTPUT:
         RETVAL
 
+void
+rcvd_localtime (self)
+        DBX_EMAIL *self;
+    PPCODE:
+        XSRETURN(datify(aTHX_ &(self->email->date), 0));
+
+void
+rcvd_gmtime (self)
+        DBX_EMAIL *self;
+    PPCODE:
+        XSRETURN(datify(aTHX_ &(self->email->date), 1));
+
 char *
 date_received (self, ...)
         DBX_EMAIL *self;
@@ -279,7 +367,6 @@ date_received (self, ...)
         char *format = "%a %b %e %H:%M:%S %Y";
         STRLEN n_a;
         size_t max_len = 25;
-        int method;
         time_t time;
         struct tm *tstruct;
         char *string;
@@ -336,7 +423,7 @@ DESTROY (self)
             safefree(self->body);
         
         dbx_free(self->dbx, self->email);
-        free(self);
+        safefree(self);
         
 
 MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx::Folder
@@ -409,7 +496,7 @@ DBX *
 dbx (self)
         DBX_FOLDER *self;
     PREINIT:
-        char *CLASS = "Mail::Transport::Dbx";
+        char *CLASS = "Mail::Transport::Dbx"; /* used in typemap */
     CODE:
         if (!self->folder->fname)
             XSRETURN_UNDEF;

@@ -1,5 +1,13 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.02  Tue Jan 14 08:28:02 CET 2003
+    - removed a segfault in header() and body() when as_string() 
+      returns undef
+    - thinned libdbx/define.h to get rid of useless macros
+    - replaced all C++ish comments from libdbx with their C counterparts
+    - some tests relied on locales settings and thus were not portable
+    - compilation: now compiles on suncc (with -Xa or -Xt set) and VisualC
+
 0.01  Fri Jan 10 07:50:23 2003
 	- original version; created by h2xs 1.22 with options
 		-O -b 5.5.3 -n Mail::Transport::Dbx /home/ethan/libdbx.h
