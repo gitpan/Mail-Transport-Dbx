@@ -1,0 +1,6 @@
+Revision history for Perl extension Mail::Transport::Dbx.
+
+0.01  Fri Jan 10 07:50:23 2003
+	- original version; created by h2xs 1.22 with options
+		-O -b 5.5.3 -n Mail::Transport::Dbx /home/ethan/libdbx.h
+
