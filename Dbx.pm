@@ -56,7 +56,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -408,6 +408,8 @@ Numerical id of the folder. Not sure what this is useful for.
 
 Numerical id of the parent's folder.
 
+=back
+
 =head1 EXPORT
 
 None by default.
@@ -526,7 +528,7 @@ Tassilo von Parseval, E<lt>tassilo.von.parseval@rwth-aachen.deE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2003 by Tassilo von Parseval
+Copyright 2003-2005 by Tassilo von Parseval
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

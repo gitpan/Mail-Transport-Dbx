@@ -1,4 +1,4 @@
-Mail/Transport/Dbx version 0.04
+Mail/Transport/Dbx version 0.05
 ===============================
 
 Mail::Transport::Dbx is a wrapper around libdbx to read Outlook Express
@@ -64,7 +64,7 @@ encounter problems (or even if not).
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2003 Tassilo von Parseval <tassilo.von.parseval@rwth-aachen.de>
+Copyright (C) 2003-2005 Tassilo von Parseval <tassilo.von.parseval@rwth-aachen.de>
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

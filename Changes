@@ -1,5 +1,8 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.05  Wed Mar 30 09:57:13 CEST 2005
+    - POD- and POD-coverage-tests
+
 0.04  Sat May 17 17:09:27 CEST 2003
     - found and fixed the segfaults in emails() and subfolders()
 
