@@ -1,5 +1,25 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.03  Sun May 11 14:49:40 CEST 2003
+    - for smoother integration into Mail::Box, Mark Overmeer suggested 
+      these new context-aware methods:
+        * Mail::Transport::Dbx->emails
+        * Mail::Transport::Dbx->subfolders
+        
+    - M::T::Email objects contained a reference to a M::T::Dbx object
+      but never increased the M::T::Dbx's refcount. Therefore, the following
+      dumped core [id: #1]:
+      
+      my $email;
+      {
+        my $dbx = Mail::Transport::Dbx->net("file.dbx");
+        $email = $dbx->get(0);
+      }
+      print $email->as_string; # segfault
+      
+    - revisited documentation and fixed typos 
+      (including one mis-spelled method-name)
+
 0.02  Tue Jan 14 08:28:02 CET 2003
     - removed a segfault in header() and body() when as_string() 
       returns undef

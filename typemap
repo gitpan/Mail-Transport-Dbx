@@ -14,7 +14,7 @@ O_OBJECT
 EM_OBJECT
     sv_setref_pv( $arg, "Mail::Transport::Dbx::Email", (void*)$var );
 GEN_OBJECT
-    if (self->type == DBX_TYPE_EMAIL) {
+    if (((DBX*)SvIV((SV*)SvRV(self)))->type == DBX_TYPE_EMAIL) {
         DBX_EMAIL *ret = (DBX_EMAIL*) safemalloc(sizeof(DBX_EMAIL));
         ret->dbx = self;
         ret->email = (DBXEMAIL*) ret_type;
@@ -23,7 +23,7 @@ GEN_OBJECT
         RETVAL = (void*)ret;
         sv_setref_pv( $arg, "Mail::Transport::Dbx::Email", (void*)$var );
     }
-    else if (self->type == DBX_TYPE_FOLDER) {
+    else if (((DBX*)SvIV((SV*)SvRV(self)))->type == DBX_TYPE_FOLDER) {
         DBX_FOLDER *ret = (DBX_FOLDER*) safemalloc(sizeof(DBX_FOLDER));
         ret->dbx = self;
         ret->folder = (DBXFOLDER*) ret_type;

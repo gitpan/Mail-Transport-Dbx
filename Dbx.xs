@@ -19,14 +19,14 @@
 #define sv_to_file(sv) (PerlIO_exportFILE(IoIFP(sv_2io(sv)), NULL))
 
 struct dbx_email {
-    DBX         *dbx;
+    SV          *dbx;
     DBXEMAIL    *email;
     char        *header;  /* just the header */
     char        *body;    /* just the body */
 };
 
 struct dbx_folder {
-    DBX         *dbx;
+    SV          *dbx;
     DBXFOLDER   *folder;
 };
 
@@ -82,7 +82,8 @@ void split_mail (pTHX_ DBX_EMAIL *self) {
 
         /* email data not yet loaded */
         if (!self->email->email) 
-            (void) dbx_get_email_body(self->dbx, self->email);
+            (void) dbx_get_email_body((DBX*)SvIV((SV*)SvRV(self->dbx)), 
+                                      self->email);
         
         ptr = self->email->email;
         
@@ -184,14 +185,23 @@ new (CLASS, dbx)
 
 void *
 get (self, index)
-        DBX *self;
+        SV *self; 
         int index;
     PREINIT:
         void *ret_type;
     CODE:
-        ret_type = dbx_get(self, index, 0);
+        
+        ret_type = dbx_get((DBX*)SvIV((SV*)SvRV(self)), index, 0);
         if (!ret_type)
             XSRETURN_UNDEF;
+        else 
+            /* objects derived from a DBX struct keep a pointer
+             * to this struct because it is needed later; so
+             * we need to increment the DBX's refcount */
+            SvREFCNT_inc(self);
+        
+        /* not assigning to RETVAL is _No_Error_ !!!
+         * the assignment happens in the typemap file */
     OUTPUT:
         RETVAL
 
@@ -218,12 +228,77 @@ msgcount (self)
         RETVAL
 
 void
+emails (object)
+        SV *object;
+    PREINIT:
+        DBX *self;
+    PPCODE:
+        self = (DBX*)SvIV((SV*)SvRV(object));
+        
+        if (GIMME_V == G_SCALAR) {
+            if (self->type == DBX_TYPE_EMAIL) 
+                XSRETURN_YES;
+            else
+                XSRETURN_NO;
+        }
+                
+        if (GIMME_V == G_ARRAY) {
+            int i;
+            if (self->indexCount == 0)
+                XSRETURN_EMPTY;
+            for (i = 0; i < self->indexCount; i++) {
+                SV *o = sv_newmortal();
+                void *item = dbx_get(self, i, 0);
+                DBX_EMAIL *ret = (DBX_EMAIL*) safemalloc(sizeof(DBX_EMAIL));
+                ret->dbx = object;
+                ret->email = (DBXEMAIL*) item;
+                ret->header = NULL;
+                ret->body = NULL;
+                SvREFCNT_inc(object);
+                o = sv_setref_pv(o, "Mail::Transport::Dbx::Email", (void*)ret);
+                XPUSHs(o);
+            }
+            XSRETURN(i);
+        }
+
+void
+subfolders (object)
+        SV *object;
+    PREINIT:
+        DBX *self;
+    PPCODE:
+        self = (DBX*)SvIV((SV*)SvRV(object));
+
+        if (GIMME_V == G_SCALAR) { 
+            if (self->type == DBX_TYPE_FOLDER) 
+                XSRETURN_YES;
+            else
+                XSRETURN_NO;
+        }
+
+        if (GIMME_V == G_ARRAY) {
+            int i;
+            if (self->indexCount == 0)
+                XSRETURN_EMPTY;
+            for (i = 0; i < self->indexCount; i++) {
+                SV *o = sv_newmortal();
+                void *item = dbx_get(self, i, 0);
+                DBX_FOLDER *ret = (DBX_FOLDER*) safemalloc(sizeof(DBX_FOLDER));
+                ret->dbx = object;
+                ret->folder = (DBXFOLDER*) item;
+                SvREFCNT_inc(object);                
+                o = sv_setref_pv(o, "Mail::Transport::Dbx::Folder", (void*)ret);
+                XPUSHs(o);
+            }
+            XSRETURN(i);
+        }
+
+void
 DESTROY (self)
         DBX *self;
     CODE:
         dbx_close(self);
         
-
 MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx::Email
 
 char *
@@ -247,7 +322,8 @@ as_string (self)
         DBX_EMAIL *self;
     CODE:
         if (!(RETVAL = self->email->email)) {
-            (void) dbx_get_email_body(self->dbx, self->email);
+            (void) dbx_get_email_body((DBX*)SvIV((SV*)SvRV(self->dbx)), 
+                                      self->email);
             if (dbx_errno == DBX_DATA_READ)
                 /* see comment in split_mail() */        
                 XSRETURN_UNDEF;
@@ -422,7 +498,9 @@ DESTROY (self)
         if (self->body)
             safefree(self->body);
         
-        dbx_free(self->dbx, self->email);
+        dbx_free((DBX*)SvIV((SV*)SvRV(self->dbx)), self->email);
+        SvREFCNT_dec(self->dbx);
+        self->dbx = NULL;
         safefree(self);
         
 
@@ -508,5 +586,7 @@ void
 DESTROY (self)
         DBX_FOLDER *self;
     CODE:
-        dbx_free(self->dbx, self->folder);
+        dbx_free((DBX*)SvIV((SV*)SvRV(self->dbx)), self->folder);
+        SvREFCNT_dec(self->dbx);
+        self->dbx = NULL;
         safefree(self);

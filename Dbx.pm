@@ -56,7 +56,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -99,7 +99,8 @@ Mail::Transport::Dbx - Parse Outlook Express mailboxes
 
     use Mail::Transport::Dbx;
 
-    my $dbx = Mail::Transport::Dbx->new("box.mbx");
+    my $dbx = eval { Mail::Transport::Dbx->new("box.mbx") };
+    die $@ if $@;
     
     for my $i (0 .. $dbx->msgcount - 1) {
         my $msg = $dbx->get($i);
@@ -107,16 +108,15 @@ Mail::Transport::Dbx - Parse Outlook Express mailboxes
         ...
     }
 
+    # more convenient
+    for my $msg ($dbx->emails) {
+        print $msg->subject;
+        ...
+    }
 
 =head1 ABSTRACT
 
-    Mail::Transport::Dbx  reads  dbx  files  (and  the  special 
-    Folders.dbx)  to extract contained  subfolders or messages. 
-    It can be used to convert a dbx file into the more standard 
-    mbox format.
-
-    This  module  is also  used  as a  backend by  Mail::Box to 
-    parse Outlook Express mailboxes.
+    Read dbx files (mailbox files of Outlook Express)
 
 =head1 DESCRIPTION
 
@@ -169,7 +169,7 @@ The following are methods for B<Mail::Transport::Dbx> objects:
 
 Passed either a string being the filename or an already opened and readable filehandle ref, C<new()> will construct a Mail::Transport::Dbx object from that.
 
-This happens regardless of whether you open an ordinary dbx file or the special Folders.dbx file that contains an overview over all available dbx subfolders.
+This happens regardless of whether you open an ordinary dbx file or the special F<Folders.dbx> file that contains an overview over all available dbx subfolders.
 
 If opening fails for some reason your program will instantly C<die()> so be sure to wrap the constructor into an C<eval()> and check for C<$@>:
 
@@ -181,6 +181,41 @@ Be careful with using a filehandle, though. On Windows, you might need to use C<
 =item B<msgcount>
 
 Returns the number of items stored in the dbx structure. If you previously opened Folders.dbx C<msgcount()> returns the number of subfolders in it. Otherwise it returns the number of messages. C<msgcount() - 1> is the index of the last item.
+
+=item B<emails>
+
+B<WARNING>: As of yet, consider this method dangerous. I had some reports that it might segfault under some circumstances that I haven't yet been able to resolve. 
+
+In list context this method returns all emails contained in the file. In boolean (that is, scalar) context it returns a true value if the file contains emails and false if it contains subfolders.
+
+    if ($dbx->emails) {
+        print "I contain emails";
+    } else {
+        print "I contain subfolders";
+    }
+
+This is useful for iterations:
+
+    for my $msg ($dbx->emails) {
+        ...
+    }
+
+=item B<subfolders>
+
+B<WARNING>: see C<emails>.
+
+In list context this method returns all subfolders of the current file as C<Mail::Transport::Dbx::Folder> objects. In boolean (scalar) context it returns true of the file contains subfolders and false if it contains emails.
+
+Remember that you still have to call C<dbx()> on these subfolders if you want to do something useful with them:
+
+    for my $sub ($dbx->subfolders) {
+        if (my $d = $sub->dbx) {
+            # $d now a proper Mail::Transport::Dbx object 
+            # with content
+        } else {
+            print "Subfolder referenced but non-existent";
+        }
+    }
 
 =item B<get(n)>
 
@@ -201,7 +236,7 @@ You can use the C<is_email()> and C<is_folder()> method to check for its type:
     }
 
 On an error, this method returns an undefined value. Check C<$dbx-E<gt>errstr> to find out what went wrong.
-    
+
 =item B<errstr>
 
 Whenever an error occurs, C<errstr()> will contain a string giving you further help what went wrong. 
@@ -236,17 +271,23 @@ Note that the string still contains the raw newlines as used by DOSish systems (
 
 On Windows this is a no-op so you can ommit this step.
 
+Especially for news-articles, this method may return C<undef>. This always happens when the particular articles was only partially downloaded (that is, only header retrieved from the newsserver). There is no way to retrieve this header literally with C<header>. Methods like C<subject> etc. however do work.
+
 =item B<header>
 
 Returns the header-portion of the whole email.
 
 With respect to newlines the same as described under C<as_string()> applies.
 
+Returns C<undef> under the same circumstances as C<as_string>.
+
 =item B<body>
 
 Returns the body-portion of the whole email.
 
 With respect to newlines the same as described under C<as_string()> applies.
+
+Returns C<undef> under the same circumstances as C<as_string>.
 
 =item B<subject>
 
@@ -367,7 +408,7 @@ This method returns an undefined value if there is no .dbx file belonging to thi
 
 Numerical id of the folder. Not sure what this is useful for.
 
-=item B<parent_it>
+=item B<parent_id>
 
 Numerical id of the parent's folder.
 
@@ -384,7 +425,7 @@ If you intend to use any of the following constants, you have to import them whe
 Or you import only those you need:
 
     use Mail::Transport::Dbx qw(DBX_TYPE_EMAIL DBX_TYPE_FOLDER);
-    
+
 =over 4 
 
 =item B<Error-Codes>
@@ -462,7 +503,7 @@ I have no idea what this is for.
 =over 8
 
 =item * DBX_EMAIL_FLAG_ISSEEN
-  
+
 =item * DBX_FLAG_BODY
 
 =back

@@ -9,6 +9,7 @@ typemap
 t/1.t
 t/2.t
 t/3.t
+t/fixed.t
 t/test.dbx
 t/test1.dbx
 libdbx/Makefile.PL
