@@ -56,7 +56,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -184,8 +184,6 @@ Returns the number of items stored in the dbx structure. If you previously opene
 
 =item B<emails>
 
-B<WARNING>: As of yet, consider this method dangerous. I had some reports that it might segfault under some circumstances that I haven't yet been able to resolve. 
-
 In list context this method returns all emails contained in the file. In boolean (that is, scalar) context it returns a true value if the file contains emails and false if it contains subfolders.
 
     if ($dbx->emails) {
@@ -201,8 +199,6 @@ This is useful for iterations:
     }
 
 =item B<subfolders>
-
-B<WARNING>: see C<emails>.
 
 In list context this method returns all subfolders of the current file as C<Mail::Transport::Dbx::Folder> objects. In boolean (scalar) context it returns true of the file contains subfolders and false if it contains emails.
 
@@ -271,7 +267,7 @@ Note that the string still contains the raw newlines as used by DOSish systems (
 
 On Windows this is a no-op so you can ommit this step.
 
-Especially for news-articles, this method may return C<undef>. This always happens when the particular articles was only partially downloaded (that is, only header retrieved from the newsserver). There is no way to retrieve this header literally with C<header>. Methods like C<subject> etc. however do work.
+Especially for news-articles this method may return C<undef>. This always happens when the particular articles was only partially downloaded (that is, only header retrieved from the newsserver). There is no way to retrieve this header literally with C<header>. Methods like C<subject> etc. however do work.
 
 =item B<header>
 

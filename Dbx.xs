@@ -18,6 +18,9 @@
 #define glob_ref(sv) (SvROK(sv) && SvTYPE(SvRV(sv)) == SVt_PVGV)
 #define sv_to_file(sv) (PerlIO_exportFILE(IoIFP(sv_2io(sv)), NULL))
 
+#define WARN        fprintf(stderr, "%i\n", __LINE__)
+#define WARNi(arg)  fprintf(stderr, "%i: %i\n", __LINE__, arg)
+
 struct dbx_email {
     SV          *dbx;
     DBXEMAIL    *email;
@@ -234,17 +237,15 @@ emails (object)
         DBX *self;
     PPCODE:
         self = (DBX*)SvIV((SV*)SvRV(object));
-        
         if (GIMME_V == G_SCALAR) {
             if (self->type == DBX_TYPE_EMAIL) 
                 XSRETURN_YES;
             else
                 XSRETURN_NO;
         }
-                
         if (GIMME_V == G_ARRAY) {
             int i;
-            if (self->indexCount == 0)
+            if (self->type != DBX_TYPE_EMAIL || self->indexCount == 0)
                 XSRETURN_EMPTY;
             for (i = 0; i < self->indexCount; i++) {
                 SV *o = sv_newmortal();
@@ -278,7 +279,7 @@ subfolders (object)
 
         if (GIMME_V == G_ARRAY) {
             int i;
-            if (self->indexCount == 0)
+            if (self->type != DBX_TYPE_FOLDER || self->indexCount == 0)
                 XSRETURN_EMPTY;
             for (i = 0; i < self->indexCount; i++) {
                 SV *o = sv_newmortal();

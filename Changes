@@ -1,5 +1,8 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.04  Sat May 17 17:09:27 CEST 2003
+    - found and fixed the segfaults in emails() and subfolders()
+
 0.03  Sun May 11 14:49:40 CEST 2003
     - for smoother integration into Mail::Box, Mark Overmeer suggested 
       these new context-aware methods:

@@ -1,4 +1,4 @@
-Mail/Transport/Dbx version 0.03
+Mail/Transport/Dbx version 0.04
 ===============================
 
 Mail::Transport::Dbx is a wrapper around libdbx to read Outlook Express
