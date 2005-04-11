@@ -21,20 +21,40 @@
 #define WARN        fprintf(stderr, "%i\n", __LINE__)
 #define WARNi(arg)  fprintf(stderr, "%i: %i\n", __LINE__, arg)
 
+/* We're not thread-safe anyway. :-)
+ * But we cannot do without for garbage-collecting. */
+int IN_DBX_DESTROY = 0;
+
 struct dbx_email {
-    SV          *dbx;
+    SV          *dbx;		/* Mail::Transport::Dbx object */
     DBXEMAIL    *email;
-    char        *header;  /* just the header */
-    char        *body;    /* just the body */
+    char        *header;	/* just the header */
+    char        *body;		/* just the body */
 };
 
 struct dbx_folder {
-    SV          *dbx;
-    DBXFOLDER   *folder;
+    SV          *dbx;		/* Mail::Transport::Dbx object */
+    DBXFOLDER   *folder;  
+    AV		*fullpath;
+};
+
+struct dbx_box {
+    DBX		*dbx;
+    SV		**subfolders;	/* Mail::Transport::Dbx::Folder objects */
+    /* originally used for fullpath() but now obsolete */
+/*  int		*indexid;
+    int		indexsize;
+*/
 };
 
 typedef struct dbx_email    DBX_EMAIL;
 typedef struct dbx_folder   DBX_FOLDER;
+typedef struct dbx_box	    DBX_BOX;
+
+typedef struct {
+    char *name;
+    int pid;
+} folder_info;
 
 /* copied from perl/pp_sys.c */
 static char *dayname[] = {
@@ -85,7 +105,7 @@ void split_mail (pTHX_ DBX_EMAIL *self) {
 
         /* email data not yet loaded */
         if (!self->email->email) 
-            (void) dbx_get_email_body((DBX*)SvIV((SV*)SvRV(self->dbx)), 
+            (void) dbx_get_email_body(((DBX_BOX*)SvIV((SV*)SvRV(self->dbx)))->dbx, 
                                       self->email);
         
         ptr = self->email->email;
@@ -163,50 +183,92 @@ int datify (pTHX_ FILETIME *wintime, int method) {
     }
 }
 
+int get_folder (SV *o, int index, SV **sv) {
+    DBX_FOLDER *folder;
+    DBX_BOX *dbx = (DBX_BOX*)SvIV(SvRV(o));
+    DBXFOLDER *ret = (DBXFOLDER*)dbx_get(dbx->dbx, index, 0);
+    New(0, folder, 1, DBX_FOLDER);
+    folder->dbx = o;
+    folder->folder = ret;
+    folder->fullpath = Nullav;
+    *sv = sv_setref_pv(newSV(0), "Mail::Transport::Dbx::Folder", (void*)folder);
+    SvREFCNT_inc(o);
+    return ret->id;
+}
+	
 MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx
 
 INCLUDE: const-xs.inc
 PROTOTYPES: DISABLED
 
-DBX *
+DBX_BOX *
 new (CLASS, dbx)
         char *CLASS;
         SV *dbx;
     PREINIT:
         STRLEN len;
     CODE:
+	New(0, RETVAL, 1, DBX_BOX);
+	RETVAL->subfolders = NULL;
         if (glob_ref(dbx) && !errno)
-            RETVAL = dbx_open_stream(sv_to_file(dbx));
+            RETVAL->dbx = dbx_open_stream(sv_to_file(dbx));
         else
-            RETVAL = dbx_open(SvPV(dbx, len));
+            RETVAL->dbx = dbx_open(SvPV(dbx, len));
 
-        if (!RETVAL)
+        if (!RETVAL->dbx)
             croak("%s", errstr());
 
     OUTPUT:
         RETVAL
 
-void *
+void
 get (self, index)
         SV *self; 
         int index;
     PREINIT:
         void *ret_type;
+	DBX_BOX *dbx;
     CODE:
-        
-        ret_type = dbx_get((DBX*)SvIV((SV*)SvRV(self)), index, 0);
+        dbx = (DBX_BOX*)SvIV((SV*)SvRV(self));
+        ret_type = dbx_get(dbx->dbx, index, 0);
         if (!ret_type)
             XSRETURN_UNDEF;
-        else 
-            /* objects derived from a DBX struct keep a pointer
-             * to this struct because it is needed later; so
-             * we need to increment the DBX's refcount */
-            SvREFCNT_inc(self);
-        
-        /* not assigning to RETVAL is _No_Error_ !!!
-         * the assignment happens in the typemap file */
-    OUTPUT:
-        RETVAL
+
+	/* objects derived from a DBX struct keep a pointer
+	 * to this struct because it is needed later; so
+	 * we need to increment the DBX's refcount */
+	SvREFCNT_inc(self); 
+	if (dbx->dbx->type == DBX_TYPE_EMAIL) {
+	    DBX_EMAIL *ret;
+	    New(0, ret, 1, DBX_EMAIL);
+	    ST(0) = sv_newmortal();
+	    ret->dbx = self;
+	    ret->email = (DBXEMAIL*) ret_type;
+	    ret->header = NULL;
+	    ret->body = NULL;
+	    sv_setref_pv(ST(0), "Mail::Transport::Dbx::Email", (void*)ret);
+	    XSRETURN(1);
+	}
+	else if (dbx->dbx->type == DBX_TYPE_FOLDER) {
+	    if (!dbx->subfolders) {
+		int id;
+		SV *sv;
+		Newz(0, dbx->subfolders, dbx->dbx->indexCount, SV*);
+		/* New(0, dbx->indexid, dbx->indexsize = dbx->dbx->indexCount, int); */
+		id = get_folder(self, index, &dbx->subfolders[index]);
+		/*
+		if (id >= dbx->indexsize) {
+		    dbx->indexsize = id+1;
+		    Renew(dbx->indexid, dbx->indexsize, int);
+		}
+		dbx->indexid[id] = index;
+		*/
+		ST(0) = sv_mortalcopy(dbx->subfolders[index]);
+	    } else 
+		ST(0) = sv_mortalcopy(dbx->subfolders[index]);
+	    //SvREFCNT_inc(self);
+	    XSRETURN(1);
+	}
 
 int 
 error (...)
@@ -224,9 +286,9 @@ errstr (...)
 
 int
 msgcount (self)
-        DBX *self;
+        DBX_BOX *self;
     CODE:
-        RETVAL = self->indexCount;
+        RETVAL = self->dbx->indexCount;
     OUTPUT:
         RETVAL
 
@@ -234,22 +296,22 @@ void
 emails (object)
         SV *object;
     PREINIT:
-        DBX *self;
+        DBX_BOX *self;
     PPCODE:
-        self = (DBX*)SvIV((SV*)SvRV(object));
+        self = (DBX_BOX*)SvIV((SV*)SvRV(object));
         if (GIMME_V == G_SCALAR) {
-            if (self->type == DBX_TYPE_EMAIL) 
+            if (self->dbx->type == DBX_TYPE_EMAIL) 
                 XSRETURN_YES;
             else
                 XSRETURN_NO;
         }
         if (GIMME_V == G_ARRAY) {
             int i;
-            if (self->type != DBX_TYPE_EMAIL || self->indexCount == 0)
+            if (self->dbx->type != DBX_TYPE_EMAIL || self->dbx->indexCount == 0)
                 XSRETURN_EMPTY;
-            for (i = 0; i < self->indexCount; i++) {
+            for (i = 0; i < self->dbx->indexCount; i++) {
                 SV *o = sv_newmortal();
-                void *item = dbx_get(self, i, 0);
+                void *item = dbx_get(self->dbx, i, 0);
                 DBX_EMAIL *ret = (DBX_EMAIL*) safemalloc(sizeof(DBX_EMAIL));
                 ret->dbx = object;
                 ret->email = (DBXEMAIL*) item;
@@ -266,12 +328,12 @@ void
 subfolders (object)
         SV *object;
     PREINIT:
-        DBX *self;
+        DBX_BOX *self;
     PPCODE:
-        self = (DBX*)SvIV((SV*)SvRV(object));
+        self = (DBX_BOX*)SvIV((SV*)SvRV(object));
 
         if (GIMME_V == G_SCALAR) { 
-            if (self->type == DBX_TYPE_FOLDER) 
+            if (self->dbx->type == DBX_TYPE_FOLDER) 
                 XSRETURN_YES;
             else
                 XSRETURN_NO;
@@ -279,26 +341,62 @@ subfolders (object)
 
         if (GIMME_V == G_ARRAY) {
             int i;
-            if (self->type != DBX_TYPE_FOLDER || self->indexCount == 0)
+            if (self->dbx->type != DBX_TYPE_FOLDER || self->dbx->indexCount == 0)
                 XSRETURN_EMPTY;
-            for (i = 0; i < self->indexCount; i++) {
-                SV *o = sv_newmortal();
-                void *item = dbx_get(self, i, 0);
-                DBX_FOLDER *ret = (DBX_FOLDER*) safemalloc(sizeof(DBX_FOLDER));
-                ret->dbx = object;
-                ret->folder = (DBXFOLDER*) item;
-                SvREFCNT_inc(object);                
-                o = sv_setref_pv(o, "Mail::Transport::Dbx::Folder", (void*)ret);
-                XPUSHs(o);
-            }
-            XSRETURN(i);
+	    if (self->subfolders) {
+		EXTEND(SP, self->dbx->indexCount);
+		for (i = 0; i < self->dbx->indexCount; i++) {
+		    if (!self->subfolders[i]) {
+			int id = get_folder(object, i, &self->subfolders[i]);
+			/*
+			if (id >= self->indexsize) {
+			    self->indexsize = id+1;
+			    Renew(self->indexid, self->indexsize, int);
+			}
+			self->indexid[id] = i;
+			*/
+		    }
+		    ST(i) = sv_mortalcopy(self->subfolders[i]);
+		    SvREFCNT_inc(object);
+		}
+		XSRETURN(self->dbx->indexCount);
+	    } else {
+		EXTEND(SP, self->dbx->indexCount);
+		New(0, self->subfolders, self->dbx->indexCount, SV*);
+		/* New(0, self->indexid, self->indexsize = self->dbx->indexCount, int); */
+		for (i = 0; i < self->dbx->indexCount; i++) {
+		    int id = get_folder(object, i, &self->subfolders[i]);
+		    /*
+		    if (id >= self->indexsize) {
+			self->indexsize = id+1;
+			Renew(self->indexid, self->indexsize, int);
+		    }
+		    self->indexid[id] = i;
+		    */
+		    PUSHs(sv_mortalcopy(self->subfolders[i]));
+		    SvREFCNT_inc(object);
+		}
+		XSRETURN(self->dbx->indexCount);
+	    }
         }
 
 void
 DESTROY (self)
-        DBX *self;
+        DBX_BOX *self;
+    PREINIT:
+	register int i;
     CODE:
-        dbx_close(self);
+	IN_DBX_DESTROY = 1;
+	if (self->subfolders) {
+	    for (i = 0; i < self->dbx->indexCount; i++) {
+		SvREFCNT_dec(self->subfolders[i]);
+	    }
+	    Safefree(self->subfolders);
+	    /* Safefree(self->indexid); */
+	    self->subfolders = NULL;
+	}
+        dbx_close(self->dbx);
+	IN_DBX_DESTROY = 0;
         
 MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx::Email
 
@@ -323,7 +421,7 @@ as_string (self)
         DBX_EMAIL *self;
     CODE:
         if (!(RETVAL = self->email->email)) {
-            (void) dbx_get_email_body((DBX*)SvIV((SV*)SvRV(self->dbx)), 
+            (void) dbx_get_email_body(((DBX_BOX*)SvIV((SV*)SvRV(self->dbx)))->dbx, 
                                       self->email);
             if (dbx_errno == DBX_DATA_READ)
                 /* see comment in split_mail() */        
@@ -499,7 +597,7 @@ DESTROY (self)
         if (self->body)
             safefree(self->body);
         
-        dbx_free((DBX*)SvIV((SV*)SvRV(self->dbx)), self->email);
+        dbx_free(((DBX_BOX*)SvIV((SV*)SvRV(self->dbx)))->dbx, self->email);
         SvREFCNT_dec(self->dbx);
         self->dbx = NULL;
         safefree(self);
@@ -571,7 +669,7 @@ is_folder (self)
     OUTPUT:
         RETVAL
        
-DBX *
+DBX_BOX *
 dbx (self)
         DBX_FOLDER *self;
     PREINIT:
@@ -579,15 +677,120 @@ dbx (self)
     CODE:
         if (!self->folder->fname)
             XSRETURN_UNDEF;
-        RETVAL = dbx_open(self->folder->fname);
+	New(0, RETVAL, 1, DBX_BOX);
+	RETVAL->subfolders = NULL;
+        RETVAL->dbx = dbx_open(self->folder->fname);
     OUTPUT:
         RETVAL
 
-void
-DESTROY (self)
-        DBX_FOLDER *self;
+SV*
+_dbx (self)
+	DBX_FOLDER *self;
     CODE:
-        dbx_free((DBX*)SvIV((SV*)SvRV(self->dbx)), self->folder);
+	RETVAL = self->dbx;
+	SvREFCNT_inc(RETVAL);
+    OUTPUT:
+	RETVAL
+
+# fullparse() below is slower than an equivalent implementation
+# in Perl, so we don't use it
+#if 0
+void
+fullpath (self)
+	DBX_FOLDER *self;
+    PREINIT:
+	register int i;
+	DBX_BOX *dbx;
+	int parent;
+	SV *sv;
+	AV *av;
+	int numret;
+    CODE:
+	av = self->fullpath;
+	if (av)
+	    goto done;    
+
+	av = newAV();
+
+	dbx = (DBX_BOX*)SvIV(SvRV(self->dbx));
+
+	if (!dbx->subfolders) {
+	    Newz(0, dbx->subfolders, dbx->dbx->indexCount, SV*);
+	    New(0, dbx->indexid, dbx->indexsize = dbx->dbx->indexCount, int);
+	}
+	    
+	for (i = 0; i < dbx->dbx->indexCount; i++) {
+	    if (!dbx->subfolders[i]) {
+		int id = get_folder(self->dbx, i, &(dbx->subfolders[i]));
+		if (id >= dbx->indexsize) {
+		    dbx->indexsize = id+1;
+		    Renew(dbx->indexid, dbx->indexsize, int);
+		}
+		dbx->indexid[id] = i;
+	    }
+	}
+
+	parent = self->folder->parentid;
+		
+	while (1) {
+	    SV *sv = dbx->subfolders[dbx->indexid[parent]];
+	    DBX_FOLDER *f = (DBX_FOLDER*)SvIV(SvRV(sv));
+	    av_push(av, newSVpv(f->folder->name, 0));
+	    if (parent == 0)
+		break;
+	    parent = f->folder->parentid;
+	}
+
+    done:
+	numret = av_len(av) + 1;
+	for (i = 0; i < numret; i++)
+	    ST(numret-i-1) = sv_mortalcopy(*av_fetch(av, i, FALSE));
+	ST(numret) = sv_2mortal(newSVpv(self->folder->name, 0));
+	XSRETURN(numret+1);
+
+#endif
+
+void
+_DESTROY (self)
+        DBX_FOLDER *self;
+    PREINIT:
+	DBX_BOX *dbx;
+	SV *sv;
+    CODE:
+	/* we have a sort of circular destruction problem here:
+	 * M::T::Dbx::DESTROY triggers M:T::DBX::Folder::DESTROY
+	 * which itself decrements DBX_BOX' refcount so
+	 * M::T::Dbx::DESTROY is called again which then calls
+	 * M::T::DBX::Folder::DESTROY and so on. */
+	if (IN_DBX_DESTROY)
+	    XSRETURN_UNDEF;
+
+	/* I don't know why I have to do this: 
+	 * without this check it will segfault under certain circumstances 
+	 * on threaded perls. */
+	if ((sv = (SV*)SvRV(self->dbx))) {
+	    dbx = (DBX_BOX*)SvIV(sv);
+	    dbx_free(dbx->dbx, self->folder);
+	}
+	
         SvREFCNT_dec(self->dbx);
+	if (self->fullpath) {
+	    SV *sv;
+	    while ((sv = av_pop(self->fullpath)) != &PL_sv_undef)
+		SvREFCNT_dec(sv);
+	    SvREFCNT_dec(self->fullpath);
+	}
         self->dbx = NULL;
-        safefree(self);
+        Safefree(self);
+	
+MODULE = Mail::Transport::Dbx PACKAGE = Mail::Transport::Dbx::folder_info
+
+void
+DESTROY (sv)
+    SV *sv;
+    CODE:
+    {
+	folder_info *finfo = (folder_info*)SvIV(SvRV(sv));
+	Safefree(finfo->name);
+	Safefree(finfo);
+    }

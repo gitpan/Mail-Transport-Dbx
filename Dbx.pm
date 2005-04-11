@@ -11,13 +11,6 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 @ISA = qw(Exporter
 	DynaLoader);
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Mail::Transport::Dbx ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
 %EXPORT_TAGS = ( 'all' => [ qw(
 	DBX_BADFILE
 	DBX_DATA_READ
@@ -56,7 +49,41 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.05';
+$VERSION = '0.06';
+
+my %FOLDERS;
+sub Mail::Transport::Dbx::Folder::folder_path {
+    my $self = shift;
+    my $id = $self->id;
+    my $dbx = $self->_dbx;
+    
+    my $folders = $FOLDERS{ $dbx };
+    # get folders data (just first time this function is called)
+    if (! $folders) {
+	for my $sub ($dbx->subfolders) {
+		my $i = $sub->id;
+		$folders->{$i}{'name'}      = $sub->name;
+		$folders->{$i}{'parent_id'} = $sub->parent_id;
+	}
+	$FOLDERS{ $dbx } = $folders;
+    }
+    # get path
+    my @path;
+    my $i = $id;
+    unshift @path, $folders->{$id}{'name'};
+    while ($i != $folders->{$i}{'parent_id'}) {
+	    $i = $folders->{$i}{'parent_id'};
+	    unshift @path, $folders->{$i}{'name'};
+    }
+    return @path;
+}
+   
+sub Mail::Transport::Dbx::Folder::DESTROY {
+    my $self = shift;
+    my $dbx = $self->_dbx;
+    delete $FOLDERS{ $dbx } if defined $dbx;
+    $self->_DESTROY;
+}
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -407,6 +434,28 @@ Numerical id of the folder. Not sure what this is useful for.
 =item B<parent_id>
 
 Numerical id of the parent's folder.
+
+=item B<folder_path>
+
+Returns the full folder name of this folder as a list of path elements. It's then in your responsibility to join them together by using a delimiter that doesn't show up in any of the elements. ;-)
+
+    print join("/", $_->folder_path), "\n" for $dbx->subfolders;
+
+    # could for instance produce a long list, such as:
+    Outlook Express/news.rwth-aachen.de/de.comp.software.announce
+    Outlook Express/news.rwth-aachen.de/de.comp.software.misc
+    ...
+    Outlook Express/Lokale Ordner/test/test1
+    Outlook Express/Lokale Ordner/test
+    Outlook Express/Lokale Ordner/Entwürfe
+    Outlook Express/Lokale Ordner/Gelöschte Objekte
+    Outlook Express/Lokale Ordner/Gesendete Objekte
+    Outlook Express/Lokale Ordner/Postausgang
+    Outlook Express/Lokale Ordner/Posteingang
+    Outlook Express/Lokale Ordner
+    Outlook Express/Outlook Express
+
+Note that a slash (as any other character) might not be a safe choice as it could show up in a folder name.
 
 =back
 

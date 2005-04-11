@@ -1,5 +1,11 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.06 Sun Apr 10 10:46:36 CEST 2005
+    - new method to retrieve a folder's full qualified name
+      (implementation by Miguel Fortea)
+    - as a result of the above: subfolders are now more 
+      intelligently cached 
+
 0.05  Wed Mar 30 09:57:13 CEST 2005
     - POD- and POD-coverage-tests
 
