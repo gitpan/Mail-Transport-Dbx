@@ -1,5 +1,9 @@
 Revision history for Perl extension Mail::Transport::Dbx.
 
+0.07 Thu Jun 23 20:58:40 CEST 2005
+    - gcc4 didn't like some lvalue casts in libdbx/libdbx.c
+      (spotted by <ville DOT skytta AT iki DOT fi>)
+
 0.06 Sun Apr 10 10:46:36 CEST 2005
     - new method to retrieve a folder's full qualified name
       (implementation by Miguel Fortea)

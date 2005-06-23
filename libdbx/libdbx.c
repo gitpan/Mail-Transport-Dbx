@@ -480,7 +480,8 @@ int _dbx_getindex(FILE* fp, int pos, DBX *dbx)
 
 int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	int x;
-	char *bufptr, *buffer, **bufx;
+	char *bufptr, *buffer; 
+	void **bufx;
 	int readtype=STRING_TYPE;
 	
 	DBXEMAIL *email = NULL;
@@ -534,75 +535,75 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	    case 0x01: 
             /* pointer to flag */
 	    	email->flag = 0;
-	    	((int*)bufx) = &(email->flag);
+	    	bufx = (void**)&(email->flag);
 	    	readtype = CHAR_TYPE;
 	    	break;
 	    case 0x04: 
             /*pointer to dataptr */
-	        ((int*)bufx) = &(email->data_offset);
+	        bufx = (void**)&(email->data_offset);
 	        readtype = INT_TYPE;
 	        break;
 	    case 0x05: 
             /* asciiz string of subject (without RE: or FWD: etc...) */
-	        bufx = &(email->psubject);
+	        bufx = (void**)&(email->psubject);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x07: 
             /* message id of email */
-	        bufx = &(email->messageid);
+	        bufx = (void**)&(email->messageid);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x08: 
             /* second copy of subject. Original text (with RE: etc...) */
-            bufx = &(email->subject);
+            bufx = (void**)&(email->subject);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x0A: 
             /* msg-id of parent(s) */
-	        bufx = &(email->parent_message_ids);
+	        bufx = (void**)&(email->parent_message_ids);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x0C: 
             /* name of server used to fetch email */
-	    	bufx = &(email->fetched_server);
+	    	bufx = (void**)&(email->fetched_server);
 	    	readtype = STRING_TYPE;
 	    	break;
 	    case 0x0D: 
             /* Sender's name */
-	        bufx = &(email->sender_name);
+	        bufx = (void**)&(email->sender_name);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x0E: 
             /* Sender's email address */
-	        bufx = &(email->sender_address);
+	        bufx = (void**)&(email->sender_address);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x12: 
             /* date - of what i'm not sure. 
              * It is in a win32 FILETIME structure. 
              * needs converting to something */
-			((struct FILETIME*)bufx) = &(email->date);
+			bufx = (void**)&(email->date);
 			readtype = W32FT_TYPE;
 			break;
 	    case 0x13: 
             /* recipient's name */
-	        bufx = &(email->recip_name);
+	        bufx = (void**)&(email->recip_name);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x14: 
             /* recipient's email address */
-	        bufx = &(email->recip_address);
+	        bufx = (void**)&(email->recip_address);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x1A: 
             /* Name of Account used to fetch email */
-	    	bufx = &(email->oe_account_name);
+	    	bufx = (void**)&(email->oe_account_name);
 	    	readtype = STRING_TYPE;
 	    	break;
 	    case 0x1B: 
             /* String version of account number 
              * used to fetch email (eg "00000001") */
-	    	bufx = &(email->oe_account_num);
+	    	bufx = (void**)&(email->oe_account_num);
 	    	readtype = STRING_TYPE;
 	    	break;
 	    case 0x80: 
@@ -642,12 +643,12 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 	    switch(blockp.type) {
 	    case 0x02: 
             /* descriptive name */
-	        bufx = &(folder->name);
+	        bufx = (void**)&(folder->name);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x03: 
             /* filename */
-	        bufx = &(folder->fname);
+	        bufx = (void**)&(folder->fname);
 	        readtype = STRING_TYPE;
 	        break;
 	    case 0x80: 
@@ -675,7 +676,7 @@ int _dbx_getitem (FILE *fp, int pos, void **item, int type, int flags) {
 
 	  if (bufx)
 	        if (_dbx_get_from_buf(buffer, blockp.val + (blockhdr.count*4), 
-                (void**)bufx, readtype, blockhdr.size))
+                                      bufx, readtype, blockhdr.size))
 	            return 1; /* an error occured */
 	  bufptr += 4; /* size of data */
 	}

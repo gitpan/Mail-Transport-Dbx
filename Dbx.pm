@@ -49,7 +49,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $AUTOLOAD);
 	DBX_TYPE_VOID
 );
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 my %FOLDERS;
 sub Mail::Transport::Dbx::Folder::folder_path {

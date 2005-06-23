@@ -1,4 +1,4 @@
-Mail/Transport/Dbx version 0.06
+Mail/Transport/Dbx version 0.07
 ===============================
 
 Mail::Transport::Dbx is a wrapper around libdbx to read Outlook Express
@@ -14,16 +14,6 @@ To install this module type the following:
    make test
    make install
 
-If you happen to be using ActiveState's Perl under Windows, you can (and in
-fact should) install this module using ppm. The installation depends on your
-ActivePerl version.  For pre-5.8.0 perls:
-
-    C:\> ppm http://mail-mboxparser.sf.net/ppm/Mail-Transport-Dbx.ppm
-
-If you are using Perl5.8.0:
-
-    C:\> ppm http://mail-mboxparser.sf.net/ppm/Mail-Transport-Dbx-580.ppm
-    
 In case of problems, read on.
 
 DEPENDENCIES
@@ -31,7 +21,6 @@ DEPENDENCIES
 This module requires these other modules and libraries:
 
     None but you need a working C compiler or 
-    ActivePerl under Windows along with a working ppm.
 
 PROBLEMS:
 
